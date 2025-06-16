@@ -9,11 +9,11 @@ X = data['text']
 y = data['label']
 
 # Vectorize text
-vectorizer = TfidfVectorizer(max_features=1000)
+vectorizer = TfidfVectorizer(max_features=500)  # Reduced features for smaller model
 X_vec = vectorizer.fit_transform(X)
 
 # Train model
-model = LogisticRegression(max_iter=1000)
+model = LogisticRegression(max_iter=1000, multi_class='ovr')
 model.fit(X_vec, y)
 
 # Save model and vectorizer

@@ -1,9 +1,10 @@
 streamlit
 textblob
-googletrans==3.1.0a0
+deep-translator
 scikit-learn
 pandas
 nltk
 joblib
 python-dateutil
 bcrypt
+streamlit-components

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Voice Component</title>
+    <script>
+        let recognition;
+        let isListening = false;
+        let transcript = '';
+        let context = window.location.hash.substring(1) || 'command'; // Get context from URL hash (e.g., #command, #journal)
+
+        function startListening() {
+            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+                alert('Speech recognition not supported in this browser.');
+                return;
+            }
+
+            recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.lang = document.getElementById('lang-select').value || 'en-US';
+            recognition.continuous = false;
+            recognition.interimResults = false;
+
+            recognition.onstart = function() {
+                isListening = true;
+                document.getElementById('status').innerText = 'Listening...';
+                document.getElementById('start-btn').innerText = 'Stop Listening';
+            };
+
+            recognition.onresult = function(event) {
+                transcript = event.results[0][0].transcript;
+                document.getElementById('command').value = transcript;
+                sendToStreamlit();
+            };
+
+            recognition.onerror = function(event) {
+                document.getElementById('status').innerText = 'Error: ' + event.error;
+                isListening = false;
+                document.getElementById('start-btn').innerText = 'Start Listening';
+            };
+
+            recognition.onend = function() {
+                isListening = false;
+                document.getElementById('status').innerText = 'Ready';
+                document.getElementById('start-btn').innerText = 'Start Listening';
+            };
+
+            recognition.start();
+        }
+
+        function toggleListening() {
+            if (isListening) {
+                recognition.stop();
+            } else {
+                startListening();
+            }
+        }
+
+        function sendToStreamlit() {
+            if (transcript) {
+                window.parent.postMessage({
+                    type: 'streamlit:setComponentValue',
+                    value: { context: context, transcript: transcript }
+                }, '*');
+            }
+        }
+    </script>
+</head>
+<body>
+    <select id="lang-select">
+        <option value="en-US">English</option>
+        <option value="hi-IN">Hindi</option>
+        <option value="es-ES">Spanish</option>
+    </select>
+    <button id="start-btn" onclick="toggleListening()">Start Listening</button>
+    <p id="status">Ready</p>
+    <input type="hidden" id="command" />
+</body>
+</html>
