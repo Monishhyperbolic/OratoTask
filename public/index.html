@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AccessiVoice Planner</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen">
+  <h1 class="text-3xl font-bold mb-4 text-gray-800">AccessiVoice Planner</h1>
+  <div id="authSection" class="w-full max-w-md mb-4">
+    <h2 class="text-xl font-semibold mb-2 text-gray-800">Login or Register</h2>
+    <div class="flex space-x-4 mb-4">
+      <input id="username" type="text" placeholder="Username" class="p-2 border rounded-lg w-1/2">
+      <input id="password" type="password" placeholder="Password" class="p-2 border rounded-lg w-1/2">
+    </div>
+    <div class="flex space-x-4">
+      <button id="loginBtn" class="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500" aria-label="Login">Login</button>
+      <button id="registerBtn" class="bg-green-500 text-white px-6 py-3 rounded-lg hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500" aria-label="Register">Register</button>
+    </div>
+  </div>
+  <div id="mainSection" class="hidden w-full max-w-4xl">
+    <p class="text-lg mb-4 text-gray-600">Logged in as: <span id="usernameDisplay"></span>. Say commands like "Add urgent meeting on July 20, 2025, at 3 PM", "List work tasks", or "Journal my thoughts".</p>
+    <div class="flex space-x-4 mb-4">
+      <button id="startVoice" class="bg-blue-500 text-white px-6 py-3 rounded-lg text-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500" aria-label="Start voice input">Start Voice Input</button>
+      <button id="journalVoice" class="bg-green-500 text-white px-6 py-3 rounded-lg text-lg hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500" aria-label="Start journal input">Journal Thoughts</button>
+    </div>
+    <h2 class="text-xl font-semibold mb-2 text-gray-800">Calendar</h2>
+    <div id="calendar" class="mb-4"></div>
+    <h2 class="text-xl font-semibold mb-2 text-gray-800">Tasks</h2>
+    <ul id="taskList" class="mb-4"></ul>
+    <h2 class="text-xl font-semibold mb-2 text-gray-800">Journal Entries</h2>
+    <ul id="journalList"></ul>
+  </div>
+
+  <script>
+    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+
+    const loginBtn = document.getElementById('loginBtn');
+    const registerBtn = document.getElementById('registerBtn');
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+    const authSection = document.getElementById('authSection');
+    const mainSection = document.getElementById('mainSection');
+    const usernameDisplay = document.getElementById('usernameDisplay');
+    const startVoiceBtn = document.getElementById('startVoice');
+    const journalVoiceBtn = document.getElementById('journalVoice');
+    const taskList = document.getElementById('taskList');
+    const journalList = document.getElementById('journalList');
+    const calendarDiv = document.getElementById('calendar');
+
+    async function login(username, password) {
+      try {
+        const response = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password }),
+          credentials: 'include'
+        });
+        const data = await response.json();
+        if (response.ok) {
+          authSection.classList.add('hidden');
+          mainSection.classList.remove('hidden');
+          usernameDisplay.textContent = data.username;
+          loadCalendar();
+          const utterance = new SpeechSynthesisUtterance(data.message);
+          window.speechSynthesis.speak(utterance);
+        } else {
+          const utterance = new SpeechSynthesisUtterance(data.detail);
+          window.speechSynthesis.speak(utterance);
+        }
+      } catch {
+        const utterance = new SpeechSynthesisUtterance('Login failed. Try again.');
+        window.speechSynthesis.speak(utterance);
+      }
+    }
+
+    async function register(username, password) {
+      try {
+        const response = await fetch('/api/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await response.json();
+        const utterance = new SpeechSynthesisUtterance(data.message || data.detail);
+        window.speechSynthesis.speak(utterance);
+      } catch {
+        const utterance = new SpeechSynthesisUtterance('Registration failed. Try again.');
+        window.speechSynthesis.speak(utterance);
+      }
+    }
+
+    loginBtn.addEventListener('click', () => login(usernameInput.value, passwordInput.value));
+    registerBtn.addEventListener('click', () => register(usernameInput.value, passwordInput.value));
+
+    async function loadCalendar() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth() + 1;
+      try {
+        const response = await fetch(`/api/calendar/${year}/${month}`, { credentials: 'include' });
+        const data = await response.json();
+        calendarDiv.innerHTML = data.calendar_html;
+      } catch {
+        calendarDiv.innerHTML = 'Failed to load calendar.';
+      }
+    }
+
+    function startRecognition(isJournal = false) {
+      recognition.start();
+      const btn = isJournal ? journalVoiceBtn : startVoiceBtn;
+      btn.textContent = 'Listening...';
+      btn.classList.add('bg-red-500', 'hover:bg-red-600');
+      recognition.onresult = async (event) => {
+        const command = event.results[0][0].transcript;
+        btn.textContent = isJournal ? 'Journal Thoughts' : 'Start Voice Input';
+        btn.classList.remove('bg-red-500', 'hover:bg-red-600');
+
+        const endpoint = isJournal ? '/api/journal-entry' : '/api/process-command';
+        try {
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ command, lang: recognition.lang }),
+            credentials: 'include'
+          });
+          const data = await response.json();
+
+          const utterance = new SpeechSynthesisUtterance(data.message);
+          utterance.lang = recognition.lang;
+          window.speechSynthesis.speak(utterance);
+
+          if (data.tasks) {
+            taskList.innerHTML = '';
+            data.tasks.forEach(task => {
+              const li = document.createElement('li');
+              li.textContent = `${task.name} - ${task.date} ${task.time || ''} (${task.priority} priority, ${task.category || 'uncategorized'})`;
+              li.className = `p-2 border-b ${task.priority === 'high' ? 'text-red-600' : task.priority === 'medium' ? 'text-yellow-600' : 'text-green-600'}`;
+              li.setAttribute('role', 'listitem');
+              taskList.appendChild(li);
+            });
+            loadCalendar();
+          }
+          if (data.journalEntries) {
+            journalList.innerHTML = '';
+            data.journalEntries.forEach(entry => {
+              const li = document.createElement('li');
+              li.textContent = `${entry.date}: ${entry.content}`;
+              li.className = 'p-2 border-b text-gray-800';
+              li.setAttribute('role', 'listitem');
+              journalList.appendChild(li);
+            });
+          }
+        } catch {
+          const utterance = new SpeechSynthesisUtterance('Error processing command. Please login.');
+          utterance.lang = recognition.lang;
+          window.speechSynthesis.speak(utterance);
+        }
+      };
+      recognition.onerror = () => {
+        const utterance = new SpeechSynthesisUtterance('Sorry, I could not understand. Please try again.');
+        utterance.lang = recognition.lang;
+        window.speechSynthesis.speak(utterance);
+        btn.textContent = isJournal ? 'Journal Thoughts' : 'Start Voice Input';
+        btn.classList.remove('bg-red-500', 'hover:bg-red-600');
+      };
+    }
+
+    startVoiceBtn.addEventListener('click', () => startRecognition(false));
+    journalVoiceBtn.addEventListener('click', () => startRecognition(true));
+
+    async function setLanguage(lang) {
+      recognition.lang = lang;
+      const utterance = new SpeechSynthesisUtterance(`Language set to ${lang}.`);
+      utterance.lang = lang;
+      window.speechSynthesis.speak(utterance);
+    }
+  </script>
+</body>
+</html>

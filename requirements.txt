@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+transformers
+torch
+googletrans==3.1.0a0
+scikit-learn
+pandas
+nltk
+joblib
+python-dateutil
+bcrypt
