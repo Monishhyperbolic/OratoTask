@@ -80,8 +80,7 @@ def parse_date(command: str):
     except:
         return datetime.now().strftime('%Y-%m-%d')
 
-def get_current_user(response: Response = Depends(lambda: Response())):
-    user_id = response.get_cookie("user_id")
+def get_current_user(user_id: str = Depends(lambda: Response().get_cookie("user_id"))):
     if not user_id:
         raise HTTPException(status_code=401, detail="Not authenticated")
     return int(user_id)
@@ -209,9 +208,9 @@ async def process_command(cmd: Command, response: Response, user_id: int = Depen
     elif result['action'] == 'add':
         message = f"Task {result['task_name']} added for {result['date']} at {result['time'] or 'anytime'} with {result['priority']} priority in {result['category']}."
         if sentiment_label == 'negative':
-            message += " Sounds like a busy day! Take a deep breath, we’ve got this."
+            message += " Sounds like a busy day! Take a deep breath, we've got this."
         elif sentiment_label == 'positive':
-            message += " Awesome, you’re killing it!"
+            message += " Awesome, you're killing it!"
     elif result['action'] == 'update':
         message = f"Task {result['task_name']} updated to {result['time']}."
     elif result['action'] == 'mark_done':
@@ -230,7 +229,7 @@ async def process_command(cmd: Command, response: Response, user_id: int = Depen
     elif result['action'] == 'set_language':
         message = f"Language set to {result['lang']}."
     else:
-        message = "Sorry, I didn’t understand. Try 'add task', 'list tasks', or 'journal'."
+        message = "Sorry, I didn't understand. Try 'add task', 'list tasks', or 'journal'."
 
     return {"message": translate_response(message, cmd.lang), "tasks": result.get('tasks', []), "lang": result.get('lang', cmd.lang)}
 
