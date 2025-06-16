@@ -1,7 +1,5 @@
-fastapi
-uvicorn
-transformers
-torch
+streamlit
+textblob
 googletrans==3.1.0a0
 scikit-learn
 pandas
