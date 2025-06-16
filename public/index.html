@@ -10,13 +10,13 @@
   <h1 class="text-3xl font-bold mb-4 text-gray-800">AccessiVoice Planner</h1>
   
   <!-- Status Messages -->
-  <div id="statusMessage" class="hidden mb-4 p-3 rounded-lg text-white"></div>
+  <div id="statusMessage" class="hidden mb-4 p-3 rounded-lg text-white" role="alert"></div>
   
   <div id="authSection" class="w-full max-w-md mb-4">
     <h2 class="text-xl font-semibold mb-2 text-gray-800">Login or Register</h2>
     <div class="flex space-x-4 mb-4">
-      <input id="username" type="text" placeholder="Username" class="p-2 border rounded-lg w-1/2">
-      <input id="password" type="password" placeholder="Password" class="p-2 border rounded-lg w-1/2">
+      <input id="username" type="text" placeholder="Username" class="p-2 border rounded-lg w-1/2" aria-label="Username">
+      <input id="password" type="password" placeholder="Password" class="p-2 border rounded-lg w-1/2" aria-label="Password">
     </div>
     <div class="flex space-x-4">
       <button id="loginBtn" class="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500" aria-label="Login">Login</button>
@@ -25,30 +25,23 @@
   </div>
   
   <div id="mainSection" class="hidden w-full max-w-4xl">
-    <p class="text-lg mb-4 text-gray-600">Logged in as: <span id="usernameDisplay"></span>. Say commands like "Add urgent meeting on July 20, 2025, at 3 PM", "List work tasks", or "Journal my thoughts".</p>
+    <p class="text-lg mb-4 text-gray-600">Logged in as: <span id="usernameDisplay" aria-live="polite"></span>. Say commands like "Add urgent meeting on July 20, 2025, at 3 PM", "List work tasks", or "Journal my thoughts".</p>
     <div class="flex space-x-4 mb-4">
       <button id="startVoice" class="bg-blue-500 text-white px-6 py-3 rounded-lg text-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500" aria-label="Start voice input">Start Voice Input</button>
       <button id="journalVoice" class="bg-green-500 text-white px-6 py-3 rounded-lg text-lg hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-500" aria-label="Start journal input">Journal Thoughts</button>
       <button id="logoutBtn" class="bg-red-500 text-white px-6 py-3 rounded-lg text-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500" aria-label="Logout">Logout</button>
     </div>
     <h2 class="text-xl font-semibold mb-2 text-gray-800">Calendar</h2>
-    <div id="calendar" class="mb-4 bg-white p-4 rounded-lg shadow"></div>
+    <div id="calendar" class="mb-4 bg-white p-4 rounded-lg shadow" aria-live="polite"></div>
     <h2 class="text-xl font-semibold mb-2 text-gray-800">Tasks</h2>
-    <ul id="taskList" class="mb-4 bg-white p-4 rounded-lg shadow"></ul>
+    <ul id="taskList" class="mb-4 bg-white p-4 rounded-lg shadow" role="list" aria-live="polite"></ul>
     <h2 class="text-xl font-semibold mb-2 text-gray-800">Journal Entries</h2>
-    <ul id="journalList" class="bg-white p-4 rounded-lg shadow"></ul>
+    <ul id="journalList" class="bg-white p-4 rounded-lg shadow" role="list" aria-live="polite"></ul>
   </div>
 
   <script>
-    // Check if browser supports speech recognition
-    if (!('SpeechRecognition' in window) && !('webkitSpeechRecognition' in window)) {
-      alert('Your browser does not support speech recognition. Please use Chrome or Safari.');
-    }
-
-    const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
+    // API Base URL
+    const API_BASE = process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:8000';
 
     // DOM Elements
     const loginBtn = document.getElementById('loginBtn');
@@ -76,9 +69,6 @@
       }, 5000);
     }
 
-    // API Base URL - change this if your backend is running on a different port
-    const API_BASE = window.location.origin;
-
     async function login(username, password) {
       if (!username || !password) {
         showStatus('Please enter both username and password', true);
@@ -102,11 +92,9 @@
           showStatus(data.message);
           loadCalendar();
           
-          // Clear form
           usernameInput.value = '';
           passwordInput.value = '';
           
-          // Speak success message
           const utterance = new SpeechSynthesisUtterance(data.message);
           window.speechSynthesis.speak(utterance);
         } else {
@@ -144,7 +132,6 @@
         
         if (response.ok) {
           showStatus(data.message);
-          // Clear form after successful registration
           usernameInput.value = '';
           passwordInput.value = '';
           
@@ -163,25 +150,34 @@
       }
     }
 
-    function logout() {
-      authSection.classList.remove('hidden');
-      mainSection.classList.add('hidden');
-      usernameDisplay.textContent = '';
-      taskList.innerHTML = '';
-      journalList.innerHTML = '';
-      calendarDiv.innerHTML = '';
-      showStatus('Logged out successfully');
-      
-      const utterance = new SpeechSynthesisUtterance('Logged out successfully');
-      window.speechSynthesis.speak(utterance);
+    async function logout() {
+      try {
+        const response = await fetch(`${API_BASE}/logout`, {
+          method: 'POST',
+          credentials: 'include'
+        });
+        if (response.ok) {
+          authSection.classList.remove('hidden');
+          mainSection.classList.add('hidden');
+          usernameDisplay.textContent = '';
+          taskList.innerHTML = '';
+          journalList.innerHTML = '';
+          calendarDiv.innerHTML = '';
+          showStatus('Logged out successfully');
+          
+          const utterance = new SpeechSynthesisUtterance('Logged out successfully');
+          window.speechSynthesis.speak(utterance);
+        }
+      } catch (error) {
+        console.error('Logout error:', error);
+        showStatus('Logout failed. Please try again.', true);
+      }
     }
 
-    // Event listeners
     loginBtn.addEventListener('click', () => login(usernameInput.value.trim(), passwordInput.value.trim()));
     registerBtn.addEventListener('click', () => register(usernameInput.value.trim(), passwordInput.value.trim()));
     logoutBtn.addEventListener('click', logout);
 
-    // Allow enter key to login
     usernameInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') login(usernameInput.value.trim(), passwordInput.value.trim());
     });
@@ -212,6 +208,16 @@
     }
 
     function startRecognition(isJournal = false) {
+      if (!('SpeechRecognition' in window) && !('webkitSpeechRecognition' in window)) {
+        showStatus('Your browser does not support speech recognition. Please use Chrome or Safari.', true);
+        return;
+      }
+
+      const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+      recognition.lang = localStorage.getItem('language') || 'en-US';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
       const btn = isJournal ? journalVoiceBtn : startVoiceBtn;
       const originalText = btn.textContent;
       
@@ -225,7 +231,6 @@
           const command = event.results[0][0].transcript;
           console.log('Voice command:', command);
           
-          // Reset button
           btn.textContent = originalText;
           btn.classList.remove('bg-red-500', 'hover:bg-red-600');
           btn.classList.add(isJournal ? 'bg-green-500' : 'bg-blue-500');
@@ -243,12 +248,10 @@
             if (response.ok) {
               const data = await response.json();
 
-              // Speak the response
               const utterance = new SpeechSynthesisUtterance(data.message);
               utterance.lang = recognition.lang;
               window.speechSynthesis.speak(utterance);
 
-              // Update UI
               if (data.tasks && data.tasks.length > 0) {
                 taskList.innerHTML = '';
                 data.tasks.forEach(task => {
@@ -258,7 +261,7 @@
                   li.setAttribute('role', 'listitem');
                   taskList.appendChild(li);
                 });
-                loadCalendar(); // Refresh calendar when tasks change
+                loadCalendar();
               }
               
               if (data.journalEntries && data.journalEntries.length > 0) {
@@ -273,6 +276,10 @@
               }
               
               showStatus('Command processed successfully');
+              
+              if (data.lang) {
+                localStorage.setItem('language', data.lang);
+              }
             } else {
               const errorData = await response.json();
               throw new Error(errorData.detail || 'Command processing failed');
@@ -293,7 +300,6 @@
         recognition.onerror = (event) => {
           console.error('Speech recognition error:', event.error);
           
-          // Reset button
           btn.textContent = originalText;
           btn.classList.remove('bg-red-500', 'hover:bg-red-600');
           btn.classList.add(isJournal ? 'bg-green-500' : 'bg-blue-500');
@@ -325,16 +331,6 @@
     startVoiceBtn.addEventListener('click', () => startRecognition(false));
     journalVoiceBtn.addEventListener('click', () => startRecognition(true));
 
-    // Language setting function (if needed)
-    async function setLanguage(lang) {
-      recognition.lang = lang;
-      const utterance = new SpeechSynthesisUtterance(`Language set to ${lang}.`);
-      utterance.lang = lang;
-      window.speechSynthesis.speak(utterance);
-      showStatus(`Language set to ${lang}`);
-    }
-
-    // Initialize the app
     console.log('AccessiVoice Planner loaded successfully');
   </script>
 </body>
