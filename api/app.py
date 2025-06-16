@@ -495,7 +495,7 @@ else:
                 st.session_state.voice_data = voice_data
                 st.rerun()
         with col2:
-            command_text = st.text_input("Type command (e.g., 'Add meeting: discuss project updates at 3 PM')", key="text_command")
+            command_text = st.text_input("Type command ( 'To add a meeting start with Add meeting to add a task start with ADD Task')", key="text_command")
             description_text = st.text_area("Task description (optional, max 50 chars)", key="description_text", max_chars=50, height=100)
             command = st.session_state.get('voice_command', '') or command_text
             if st.button("Process Command", key="process_command"):
